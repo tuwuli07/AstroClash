@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include<string>
+#include <ctime>
 
 using namespace std;
 
@@ -34,6 +35,7 @@ using namespace std;
 #define enemylaserheight 40
 #define bossheight 256
 #define bosswidth 500
+#define HEALTH_ITEM_INTERVAL 8000
 
 void drawHomePage();
 void drawStartPage();
@@ -116,10 +118,18 @@ struct enemy {
 };
 enemy bossEnemy = { 0.0, 0.0, false, 0.1, 0.1, false, 120, false };
 enemy asteroid[asteroidnumber];
-enemy healthitem[healthnumber];
+//enemy healthitem[healthnumber];
 enemy easyEnemyShip[easyenemyshipnumber] = { 0, 0, false, 3, 3, false, 4, false };
 enemy mediumEnemyShip[mediumenemyshipnumber] = { 0, 0, false, 3, 3, false, 6, false };
 enemy hardEnemyShip[hardenemyshipnumber] = { 0, 0, false, 3, 3, false, 8, false };
+
+struct HealthItem {
+	int x;
+	int y;
+	bool show;
+	clock_t lastFallTime;
+};
+struct HealthItem healthitem[healthnumber];
 
 struct Explosion {
 	float x, y;
@@ -317,11 +327,12 @@ void initializeAsteroids() {
 		asteroid[i].show = true;
 	}
 }
-void initializeHealthItem(){
+void initializeHealthItem() {
 	for (int i = 0; i < healthnumber; ++i) {
 		healthitem[i].x = rand() % (screenwidth - healthwidth);
 		healthitem[i].y = screenheight + rand() % 100;
-		healthitem[i].show = true;
+		healthitem[i].show = false;
+		healthitem[i].lastFallTime = clock();
 	}
 }
 void initializeEasyEnemySpaceship() {
@@ -787,24 +798,17 @@ void enemy_spawn() {
 		for (int i = 0; i < healthnumber; i++) {
 			if (healthitem[i].show) {
 				iShowImage(healthitem[i].x, healthitem[i].y, healthwidth, healthheight, healthimg);
-			}
 
-			if (healthitem[i].show && checkCollision(spaceship_x, spaceship_y, spaceship_width, spaceship_height, healthitem[i].x, healthitem[i].y, healthwidth, healthheight)) {
-				healthitem[i].show = false;
-				if (playerLives <= MAX_LIVES) {
-					playerLives++;
+				if (checkCollision(spaceship_x, spaceship_y, spaceship_width, spaceship_height,
+					healthitem[i].x, healthitem[i].y, healthwidth, healthheight)) {
+					healthitem[i].show = false;
+					if (playerLives < MAX_LIVES) {
+						playerLives++;
+					}
 				}
-			}
 
-			if (healthitem[i].y < 0) {
-				healthitem[i].show = false;
-			}
-
-			if (!healthitem[i].show) {
-				if (rand() % 100 < 20) {
-					healthitem[i].x = rand() % (screenwidth - healthwidth);
-					healthitem[i].y = screenheight + rand() % 100;
-					healthitem[i].show = true;
+				if (healthitem[i].y < 0) {
+					healthitem[i].show = false;
 				}
 			}
 		}
@@ -1009,10 +1013,19 @@ void updateAsteroids() {
 		}
 	}
 }
-void updateHealthItem(){
-	for (int i = 0; i < healthnumber; ++i){
-		if (healthitem[i].show){
-			healthitem[i].y -= 3.0;
+void updateHealthItem() {
+	clock_t currentTime = clock();
+
+	for (int i = 0; i < healthnumber; ++i) {
+		if (!healthitem[i].show && (currentTime - healthitem[i].lastFallTime) > HEALTH_ITEM_INTERVAL) {
+			healthitem[i].x = rand() % (screenwidth - healthwidth);
+			healthitem[i].y = screenheight + rand() % 100;
+			healthitem[i].show = true;
+			healthitem[i].lastFallTime = currentTime;
+		}
+
+		if (healthitem[i].show) {
+			healthitem[i].y -= 4;
 		}
 	}
 }
@@ -1563,6 +1576,9 @@ int main(int argc, char *argv[]) {
 	loadAllImages();
 	loadSoundEffects();
 	loadHighScore();
+
+	srand(time(NULL));
+	initializeHealthItem();
 
 	iSetTimer(10, updateBackground);
 	iSetTimer(10, updateLasers);
